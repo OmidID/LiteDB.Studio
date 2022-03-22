@@ -1,4 +1,6 @@
-﻿using System;
+﻿#if NOT
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -28,7 +30,7 @@ namespace LiteDB.Studio.Forms
 
             chkUpgrade.Checked = cs.Upgrade;
 
-            cmbCulture.DataSource = 
+            cmbCulture.DataSource =
                 CultureInfo.GetCultures(CultureTypes.AllCultures)
                 .Select(x => x.LCID)
                 .Distinct()
@@ -131,3 +133,5 @@ namespace LiteDB.Studio.Forms
         }
     }
 }
+
+#endif

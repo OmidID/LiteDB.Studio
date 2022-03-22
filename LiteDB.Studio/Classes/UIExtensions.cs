@@ -1,32 +1,29 @@
-﻿using ICSharpCode.TextEditor.Gui.CompletionWindow;
-using LiteDB.Engine;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Data;
-using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+using Avalonia.Controls;
+using Avalonia.Data;
+using AvaloniaEdit;
+using AvaloniaEdit.TextMate;
+using LiteDB.Studio.Converters;
+using TextMateSharp.Grammars;
 
 namespace LiteDB.Studio
 {
-    static class UIExtensions
+    static class UiExtensions
     {
-        public static void BindBsonData(this DataGridView grd, TaskData data)
+
+	    public static void BindBsonData(this DataGrid grd, TaskData data)
         {
             // hide grid if has more than 100 rows
-            grd.Visible = data.Result.Count < 100;
+            grd.IsVisible = data.Result.Count < 100;
             grd.Clear();
 
             foreach (var value in data.Result)
             {
-                var row = new DataGridViewRow();
+                var row = new DataGridRow();
 
                 var doc = value.IsDocument ?
                     value.AsDocument :
@@ -36,77 +33,81 @@ namespace LiteDB.Studio
 
                 foreach (var key in doc.Keys)
                 {
-                    var col = grd.Columns[key];
+	                if (grd.Columns.FirstOrDefault(f => f.Header == key) is DataGridTextColumn col) continue;
 
-                    if (col == null)
+	                col = new DataGridTextColumn() { Header = key };
+                    grd.Columns.Add(col);
+
+                    col.Width = DataGridLength.Auto;
+
+                    col.IsReadOnly = key == "_id";
+                    col.Binding = new Binding
                     {
-                        grd.Columns.Add(key, key);
-
-                        col = grd.Columns[key];
-                        col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-
-                        col.ReadOnly = key == "_id";
-                    }
+	                    Converter = new BsonValueConverter()
+	                    {
+		                    Key = key
+	                    }
+                    };
                 }
 
-                row.DefaultCellStyle.BackColor = Color.Silver;
-                row.CreateCells(grd);
+                //row.DefaultCellStyle.BackColor = Color.Silver;
+                //row.CreateCells(grd);
 
-                foreach (var key in doc.Keys)
-                {
-                    var col = grd.Columns[key];
-                    var cell = row.Cells[col.Index];
 
-                    cell.Style.BackColor = Color.White;
-                    cell.Value = value.IsDocument ? value[key] : value;
-
-                    row.ReadOnly = key == "_id";
-                }
-
-                grd.Rows.Add(row);
+                // foreach (var key in doc.Keys)
+                // {
+                //     var col = grd.Columns[key];
+                //     var cell = row.Cells[col.Index];
+                //
+                //     cell.Style.BackColor = Color.White;
+                //     cell.Value = value.IsDocument ? value[key] : value;
+                //
+                //     row.ReadOnly = key == "_id";
+                // }
+                //
+                // grd.Rows.Add(row);
             }
 
-            if (data.LimitExceeded)
-            {
-                var limitRow = new DataGridViewRow();
-                limitRow.CreateCells(grd);
-                limitRow.DefaultCellStyle.ForeColor = Color.OrangeRed;
-                var cell = limitRow.Cells[0];
-                cell.Value = "Limit exceeded";
-                cell.ReadOnly = true;
-                grd.Rows.Add(limitRow);
-            }
+            // if (data.LimitExceeded)
+            // {
+            //     var limitRow = new DataGridViewRow();
+            //     limitRow.CreateCells(grd);
+            //     limitRow.DefaultCellStyle.ForeColor = Color.OrangeRed;
+            //     var cell = limitRow.Cells[0];
+            //     cell.Value = "Limit exceeded";
+            //     cell.ReadOnly = true;
+            //     grd.Rows.Add(limitRow);
+            // }
+            //
+            // for (int i = 0; i <= grd.Columns.Count - 1; i++)
+            // {
+            //     var colw = grd.Columns[i].Width;
+            //     grd.Columns[i].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            //     grd.Columns[i].Width = Math.Min(colw, 400);
+            // }
+            //
+            // if (grd.Rows.Count == 0)
+            // {
+            //     grd.Columns.Add("no-data", "[no result]");
+            // }
 
-            for (int i = 0; i <= grd.Columns.Count - 1; i++)
-            {
-                var colw = grd.Columns[i].Width;
-                grd.Columns[i].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-                grd.Columns[i].Width = Math.Min(colw, 400);
-            }
+            grd.IsReadOnly = !grd.Columns.Any(f=>f.Header == "_id");
+            grd.IsVisible = true;
 
-            if (grd.Rows.Count == 0)
-            {
-                grd.Columns.Add("no-data", "[no result]");
-            }
-
-            grd.ReadOnly = grd.Columns["_id"] == null;
-            grd.Visible = true;
+            grd.Items = data.Result;
         }
 
-        public static void DoubleBuffered(this DataGridView dgv, bool setting)
-        {
-            var dgvType = dgv.GetType();
-            var pi = dgvType.GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic);
-            pi.SetValue(dgv, setting, null);
-        }
-
-        public static void Clear(this DataGridView grd)
+        public static void Clear(this DataGrid grd)
         {
             grd.Columns.Clear();
-            grd.DataSource = null;
+            grd.Items = null;
         }
 
-        public static void BindBsonData(this ICSharpCode.TextEditor.TextEditorControl txt, TaskData data)
+        public static void BindBsonData(
+	        this TextEditor txt,
+	        TextMate.Installation textMate,
+	        RegistryOptions registryOptions,
+	        TaskData data)
         {
             var index = 0;
             var sb = new StringBuilder();
@@ -144,19 +145,31 @@ namespace LiteDB.Studio
                 }
             }
 
-            txt.SetHighlighting("JSON");
+            textMate.SetGrammar(registryOptions.GetScopeByLanguageId(registryOptions.GetLanguageByExtension(".json").Id));
             txt.Text = sb.ToString();
         }
 
-        public static void BindErrorMessage(this DataGridView grid, string sql, Exception ex)
+        public static void BindErrorMessage(this DataGrid grid, string sql, Exception ex)
         {
             grid.Clear();
-            grid.Columns.Add("err", "Error");
-            grid.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            grid.Rows.Add(ex.Message);
+
+            var col = new DataGridTextColumn() { Header = "Error" };
+            grid.Columns.Add(col);
+
+            col.Width = DataGridLength.Auto;
+
+            col.IsReadOnly = true;
+            col.Binding = new Binding();
+
+            grid.Items = new List<string>() { ex.Message };
         }
 
-        public static void BindErrorMessage(this ICSharpCode.TextEditor.TextEditorControl txt, string sql, Exception ex)
+        public static void BindErrorMessage(
+	        this TextEditor txt,
+	        TextMate.Installation textMate,
+	        RegistryOptions registryOptions,
+	        string sql,
+	        Exception ex)
         {
             var sb = new StringBuilder();
 
@@ -187,16 +200,19 @@ namespace LiteDB.Studio
                 }
             }
 
-            txt.Highlighting = null;
+            textMate.SetGrammar(null);
             txt.Clear();
             txt.Text = sb.ToString();
         }
 
-        public static void BindParameter(this ICSharpCode.TextEditor.TextEditorControl txt, TaskData data)
+        public static void BindParameter(
+	        this TextEditor txt,
+	        TextMate.Installation textMate,
+	        RegistryOptions registryOptions,
+	        TaskData data)
         {
-            txt.SuspendLayout();
-            txt.Clear();
-            txt.SetHighlighting("JSON");
+	        txt.Clear();
+	        textMate.SetGrammar(registryOptions.GetScopeByLanguageId(registryOptions.GetLanguageByExtension(".json").Id));
 
             var sb = new StringBuilder();
 
@@ -212,7 +228,6 @@ namespace LiteDB.Studio
             }
 
             txt.Text = sb.ToString();
-            txt.ResumeLayout();
         }
     }
 }

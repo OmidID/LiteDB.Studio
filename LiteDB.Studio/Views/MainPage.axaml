@@ -1,0 +1,91 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:avaloniaEdit="https://github.com/avaloniaui/avaloniaedit"
+        xmlns:i="clr-namespace:Projektanker.Icons.Avalonia;assembly=Projektanker.Icons.Avalonia"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="LiteDB.Studio.Views.MainPage"
+        Title="MainPage">
+	<DockPanel>
+		<StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Classes="Toolbar">
+			<Button Content="Disconnect" Tag="fas fa-plug" />
+			<Button Content="Refresh" Tag="fas fa-sync" />
+			<Button Content="Run" Tag="fas fa-play" Foreground="Green" Command="{Binding RunCommand}" />
+			<Rectangle Classes="Sep"></Rectangle>
+			<Button Content="Begin" Tag="fas fa-play-circle" />
+			<Button Content="Commit" Tag="fad fa-database" />
+			<Button Content="Rollback" Tag="fas fa-trash-restore" />
+			<Rectangle Classes="Sep"></Rectangle>
+			<Button Content="Checkpoint" Tag="fas fa-caret-square-down" />
+		</StackPanel>
+
+		<Grid DockPanel.Dock="Bottom"
+		      Height="28"
+		      Background="{DynamicResource SystemControlPageBackgroundChromeLowBrush}"
+		      ColumnDefinitions="*,Auto,Auto,Auto"
+		      Classes="StatusBar">
+			<TextBlock Grid.Column="0" Text="{Binding TextPosition}" VerticalAlignment="Center"></TextBlock>
+			<ProgressBar Grid.Column="1"
+			             IsIndeterminate="{Binding Loading}"
+			             IsVisible="{Binding Loading}"
+			             VerticalAlignment="Center"></ProgressBar>
+			<TextBlock Grid.Column="2" Text="1 documents" VerticalAlignment="Center"></TextBlock>
+			<TextBlock Grid.Column="3" Text="0:0:0.90" VerticalAlignment="Center"></TextBlock>
+		</Grid>
+
+		<SplitView IsPaneOpen="True"
+		           DisplayMode="CompactInline"
+		           OpenPaneLength="296">
+			<SplitView.Pane>
+				<TreeView Items="{Binding TreeViewNodes}">
+					<TreeView.ItemTemplate>
+						<TreeDataTemplate ItemsSource="{Binding Nodes}">
+							<Grid ColumnDefinitions="Auto, *" DoubleTapped="TreeViewItem_OnDoubleTapped">
+								<i:Icon Value="{Binding Icon}" Margin="4" VerticalAlignment="Center" />
+								<TextBlock Grid.Column="1" Text="{Binding Name}" Margin="4" VerticalAlignment="Center"/>
+							</Grid>
+						</TreeDataTemplate>
+					</TreeView.ItemTemplate>
+				</TreeView>
+			</SplitView.Pane>
+
+			<Grid RowDefinitions="30,*,2,*">
+				<TabStrip Items="{Binding Tasks}" SelectedItem="{Binding ActiveTask}">
+					<TabStrip.ItemTemplate>
+						<DataTemplate>
+							<TextBlock Text="{Binding Title}" />
+						</DataTemplate>
+					</TabStrip.ItemTemplate>
+				</TabStrip>
+				<avaloniaEdit:TextEditor
+					Grid.Row="1"
+					Name="Editor"
+					BorderThickness="1"
+					BorderBrush="{DynamicResource SystemControlPageBackgroundChromeLowBrush}"
+					ShowLineNumbers="True"
+					TextChanged="Editor_OnTextChanged"/>
+				<GridSplitter Grid.Row="2"
+				              ResizeDirection="Rows"
+				              Background="{DynamicResource SystemControlPageBackgroundChromeLowBrush}"></GridSplitter>
+				<TabControl Grid.Row="3">
+					<TabItem Header="Grid">
+						<DataGrid Name="DataGrid"
+						          AutoGenerateColumns="False"
+						          VerticalAlignment="Stretch"
+						          HorizontalAlignment="Stretch">
+						</DataGrid>
+					</TabItem>
+					<TabItem Header="Text">
+						<avaloniaEdit:TextEditor Name="ResultEditor" IsReadOnly="True"></avaloniaEdit:TextEditor>
+					</TabItem>
+					<TabItem Header="Parameters">
+						<avaloniaEdit:TextEditor Name="ParameterEditor" IsReadOnly="True"></avaloniaEdit:TextEditor>
+					</TabItem>
+
+				</TabControl>
+			</Grid>
+		</SplitView>
+
+	</DockPanel>
+</Window>

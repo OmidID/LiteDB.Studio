@@ -1,24 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
-using System.Diagnostics;
-using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace LiteDB.Studio
 {
-    class TaskData
+    public class TaskData
     {
         public const int RESULT_LIMIT = 1000;
 
+        public string Title => Id > 0 ? Id.ToString() : "+";
         public int Id { get; set; }
         public bool Executing { get; set; } = false;
 
         public string EditorContent { get; set; } = "";
         public string SelectedTab { get; set; } = "";
-        public Tuple<int, int> Position { get; set; }
+        public (int, int) Position { get; set; }
 
         public string Sql { get; set; } = "";
         public string Collection { get; set; } = "";

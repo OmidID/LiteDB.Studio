@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using ICSharpCode.TextEditor.Util;
+using Avalonia;
+using Projektanker.Icons.Avalonia;
+using Projektanker.Icons.Avalonia.FontAwesome;
 
 namespace LiteDB.Studio
 {
@@ -15,16 +16,15 @@ namespace LiteDB.Studio
         [STAThread]
         static void Main(string[] args)
         {
-            Application.ApplicationExit += OnExit;
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm(args.Length == 0 ? null : args[0]));
+	        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
 
-        private static void OnExit(object sender, EventArgs eventArgs)
+        static AppBuilder BuildAvaloniaApp()
         {
-            Application.ApplicationExit -= OnExit;
-            AppSettingsManager.PersistData();
+	        return AppBuilder.Configure<App>()
+		        .UsePlatformDetect()
+		        .WithIcons(container => container
+			        .Register<FontAwesomeIconProvider>());
         }
     }
 }

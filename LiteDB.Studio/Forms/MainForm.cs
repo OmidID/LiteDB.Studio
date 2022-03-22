@@ -1,4 +1,6 @@
-﻿using ICSharpCode.TextEditor;
+﻿#if NOT
+
+using ICSharpCode.TextEditor;
 using LiteDB.Engine;
 using LiteDB.Studio.Forms;
 using System;
@@ -75,7 +77,7 @@ namespace LiteDB.Studio
             {
                 this.Connect(AppSettingsManager.ApplicationSettings.LastConnectionStrings);
             }
-            
+
             // set load last db status to checkbox
 
             loadLastDb.Checked = AppSettingsManager.ApplicationSettings.LoadLastDbOnStartup;
@@ -83,10 +85,10 @@ namespace LiteDB.Studio
 
             // validate recent list
             AppSettingsManager.ValidateRecentList();
-            
+
             // add tooltip to Max Recent List Items UpDown Counter
             maxRecentItemsTooltip.SetToolTip(maxRecentListItems, "Max Recent Items, (Apply After Restart)");
-            
+
             // populate recent db list
             PopulateRecentList();
 
@@ -392,10 +394,10 @@ namespace LiteDB.Studio
                 lblResultCount.Visible = true;
                 lblElapsed.Text = data.Elapsed.ToString();
                 prgRunning.Style = ProgressBarStyle.Blocks;
-                lblResultCount.Text = 
+                lblResultCount.Text =
                     data.Result == null ? "" :
                     data.Result.Count == 0 ? "no documents" :
-                    data.Result.Count  == 1 ? "1 document" : 
+                    data.Result.Count  == 1 ? "1 document" :
                     data.Result.Count + (data.LimitExceeded ? "+" : "") + " documents";
 
                 if (data.Exception != null)
@@ -698,7 +700,7 @@ namespace LiteDB.Studio
             // set focus to result
             this.ActiveControl =
                 tabResult.SelectedTab == tabGrid ? (Control)grdResult :
-                tabResult.SelectedTab == tabText ? (Control)txtResult : (Control)txtParameters; 
+                tabResult.SelectedTab == tabText ? (Control)txtResult : (Control)txtParameters;
         }
 
         private void TabSql_MouseClick(object sender, MouseEventArgs e)
@@ -880,3 +882,5 @@ namespace LiteDB.Studio
         }
     }
 }
+
+#endif

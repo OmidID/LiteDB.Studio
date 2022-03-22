@@ -1,0 +1,56 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:i="clr-namespace:Projektanker.Icons.Avalonia;assembly=Projektanker.Icons.Avalonia">
+	<Design.PreviewWith>
+		<Border Padding="20">
+			<!-- Add Controls for Previewer Here -->
+		</Border>
+	</Design.PreviewWith>
+
+	<Styles.Resources>
+		<Color x:Key="SystemAccentColorDark2">#FF004275</Color>
+	</Styles.Resources>
+
+	<Style Selector="StackPanel.Toolbar > Button">
+		<Setter Property="Margin" Value="1 2"></Setter>
+		<Setter Property="Padding" Value="6"></Setter>
+		<Setter Property="VerticalAlignment" Value="Center"></Setter>
+		<Setter Property="Template">
+			<ControlTemplate>
+				<Grid Margin="{TemplateBinding Margin}">
+					<Rectangle Fill="{TemplateBinding Background}"
+					           StrokeThickness="{TemplateBinding BorderThickness}"
+					           Stroke="{TemplateBinding BorderBrush}"
+					           VerticalAlignment="Stretch"
+					           HorizontalAlignment="Stretch"></Rectangle>
+					<StackPanel Orientation="Horizontal"
+					            VerticalAlignment="Stretch"
+					            HorizontalAlignment="Stretch"
+					            Margin="{TemplateBinding Padding}">
+						<i:Icon Value="{TemplateBinding Tag}"
+						        Margin="{TemplateBinding Padding}"
+						        Foreground="{TemplateBinding Foreground}"
+						        VerticalAlignment="{TemplateBinding VerticalAlignment}"></i:Icon>
+						<ContentPresenter Content="{TemplateBinding Content}"
+						                  VerticalAlignment="{TemplateBinding VerticalAlignment}"
+						                  Margin="{TemplateBinding Padding}"></ContentPresenter>
+					</StackPanel>
+				</Grid>
+			</ControlTemplate>
+		</Setter>
+	</Style>
+
+	<Style Selector="StackPanel.Toolbar > Rectangle.Sep">
+		<Setter Property="Width" Value="2"></Setter>
+		<Setter Property="Fill" Value="{DynamicResource SystemControlPageBackgroundChromeLowBrush}"></Setter>
+		<Setter Property="Margin" Value="3 8"></Setter>
+	</Style>
+
+	<Style Selector="Grid.StatusBar > TextBlock">
+		<Setter Property="Margin" Value="3"></Setter>
+	</Style>
+	<Style Selector="Grid.StatusBar > ProgressBar">
+		<Setter Property="Margin" Value="3"></Setter>
+	</Style>
+
+</Styles>
