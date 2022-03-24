@@ -53,4 +53,16 @@
 		<Setter Property="Margin" Value="3"></Setter>
 	</Style>
 
+	<Style Selector="Button.Hyperlink">
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="BorderThickness" Value="0" />
+		<Setter Property="Margin" Value="-5"/>
+		<!-- <Setter Property="Foreground" Value="#419df2" /> -->
+		<Setter Property="Foreground" Value="{DynamicResource SystemControlHyperlinkTextBrush}"></Setter>
+		<Setter Property="Command" Value="{Binding OpenBrowser}" />
+		<Setter Property="Content" Value="{Binding $self.CommandParameter}" />
+		<Setter Property="HorizontalAlignment" Value="Center" />
+		<Setter Property="Cursor" Value="Hand" />
+	</Style>
+
 </Styles>

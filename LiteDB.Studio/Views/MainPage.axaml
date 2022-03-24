@@ -9,15 +9,16 @@
         Title="MainPage">
 	<DockPanel>
 		<StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Classes="Toolbar">
-			<Button Content="Disconnect" Tag="fas fa-plug" />
-			<Button Content="Refresh" Tag="fas fa-sync" />
-			<Button Content="Run" Tag="fas fa-play" Foreground="Green" Command="{Binding RunCommand}" />
+			<Button Content="Open" Tag="fas fa-plug" Command="{Binding OpenCommand}" IsVisible="{Binding !Connected}" />
+			<Button Content="Disconnect" Tag="fas fa-plug" Command="{Binding DisconnectCommand}" IsVisible="{Binding Connected}" />
+			<Button Content="Refresh" Tag="fas fa-sync" Command="{Binding RefreshCommand}" IsEnabled="{Binding Connected}" />
+			<Button Content="Run" Tag="fas fa-play" Foreground="Green" Command="{Binding RunCommand}" IsEnabled="{Binding Connected}" />
 			<Rectangle Classes="Sep"></Rectangle>
-			<Button Content="Begin" Tag="fas fa-play-circle" />
-			<Button Content="Commit" Tag="fad fa-database" />
-			<Button Content="Rollback" Tag="fas fa-trash-restore" />
+			<Button Content="Begin" Tag="fas fa-play-circle" Command="{Binding BeginCommand}" IsEnabled="{Binding Connected}" />
+			<Button Content="Commit" Tag="fad fa-database" Command="{Binding CommitCommand}" IsEnabled="{Binding Connected}" />
+			<Button Content="Rollback" Tag="fas fa-trash-restore" Command="{Binding RollbackCommand}" IsEnabled="{Binding Connected}" />
 			<Rectangle Classes="Sep"></Rectangle>
-			<Button Content="Checkpoint" Tag="fas fa-caret-square-down" />
+			<Button Content="Checkpoint" Tag="fas fa-caret-square-down" Command="{Binding CheckpointCommand}" IsEnabled="{Binding Connected}" />
 		</StackPanel>
 
 		<Grid DockPanel.Dock="Bottom"
@@ -30,15 +31,15 @@
 			             IsIndeterminate="{Binding Loading}"
 			             IsVisible="{Binding Loading}"
 			             VerticalAlignment="Center"></ProgressBar>
-			<TextBlock Grid.Column="2" Text="1 documents" VerticalAlignment="Center"></TextBlock>
-			<TextBlock Grid.Column="3" Text="0:0:0.90" VerticalAlignment="Center"></TextBlock>
+			<TextBlock Grid.Column="2" Text="{Binding DocumentsStatus}" VerticalAlignment="Center"></TextBlock>
+			<TextBlock Grid.Column="3" Text="{Binding ElapsedStatus}" VerticalAlignment="Center"></TextBlock>
 		</Grid>
 
 		<SplitView IsPaneOpen="True"
 		           DisplayMode="CompactInline"
 		           OpenPaneLength="296">
 			<SplitView.Pane>
-				<TreeView Items="{Binding TreeViewNodes}">
+				<TreeView Items="{Binding TreeViewNodes}" IsEnabled="{Binding Connected}">
 					<TreeView.ItemTemplate>
 						<TreeDataTemplate ItemsSource="{Binding Nodes}">
 							<Grid ColumnDefinitions="Auto, *" DoubleTapped="TreeViewItem_OnDoubleTapped">
@@ -51,7 +52,7 @@
 			</SplitView.Pane>
 
 			<Grid RowDefinitions="30,*,2,*">
-				<TabStrip Items="{Binding Tasks}" SelectedItem="{Binding ActiveTask}">
+				<TabStrip Items="{Binding Tasks}" SelectedItem="{Binding ActiveTask}" IsEnabled="{Binding Connected}">
 					<TabStrip.ItemTemplate>
 						<DataTemplate>
 							<TextBlock Text="{Binding Title}" />
@@ -64,6 +65,7 @@
 					BorderThickness="1"
 					BorderBrush="{DynamicResource SystemControlPageBackgroundChromeLowBrush}"
 					ShowLineNumbers="True"
+					IsEnabled="{Binding Connected}"
 					TextChanged="Editor_OnTextChanged"/>
 				<GridSplitter Grid.Row="2"
 				              ResizeDirection="Rows"
@@ -71,16 +73,17 @@
 				<TabControl Grid.Row="3">
 					<TabItem Header="Grid">
 						<DataGrid Name="DataGrid"
+						          IsEnabled="{Binding Connected}"
 						          AutoGenerateColumns="False"
 						          VerticalAlignment="Stretch"
 						          HorizontalAlignment="Stretch">
 						</DataGrid>
 					</TabItem>
 					<TabItem Header="Text">
-						<avaloniaEdit:TextEditor Name="ResultEditor" IsReadOnly="True"></avaloniaEdit:TextEditor>
+						<avaloniaEdit:TextEditor Name="ResultEditor" IsReadOnly="True" IsEnabled="{Binding Connected}"></avaloniaEdit:TextEditor>
 					</TabItem>
 					<TabItem Header="Parameters">
-						<avaloniaEdit:TextEditor Name="ParameterEditor" IsReadOnly="True"></avaloniaEdit:TextEditor>
+						<avaloniaEdit:TextEditor Name="ParameterEditor" IsReadOnly="True" IsEnabled="{Binding Connected}"></avaloniaEdit:TextEditor>
 					</TabItem>
 
 				</TabControl>

@@ -8,7 +8,7 @@ namespace LiteDB.Studio
 {
 	public class App : Application
 	{
-		internal static IClassicDesktopStyleApplicationLifetime Lifetime => Current.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+		internal static IClassicDesktopStyleApplicationLifetime Lifetime => Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
 
 		public override void Initialize()
 		{

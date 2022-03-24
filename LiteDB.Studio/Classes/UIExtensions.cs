@@ -14,7 +14,6 @@ namespace LiteDB.Studio
 {
     static class UiExtensions
     {
-
 	    public static void BindBsonData(this DataGrid grd, TaskData data)
         {
             // hide grid if has more than 100 rows
@@ -23,7 +22,7 @@ namespace LiteDB.Studio
 
             foreach (var value in data.Result)
             {
-                var row = new DataGridRow();
+                //var row = new DataGridRow();
 
                 var doc = value.IsDocument ?
                     value.AsDocument :
@@ -43,6 +42,7 @@ namespace LiteDB.Studio
                     col.IsReadOnly = key == "_id";
                     col.Binding = new Binding
                     {
+	                    Mode = BindingMode.TwoWay,
 	                    Converter = new BsonValueConverter()
 	                    {
 		                    Key = key

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using LiteDB.Studio.ViewServices;
 
 namespace LiteDB.Studio.ViewModels;
 
@@ -19,9 +20,20 @@ public class MainPageViewModel : ViewModelBase
 	private DatabaseDebugger _debugger = null;
 	private TaskData _activeTask;
 	private bool _isActive;
+	private bool _connected;
 
 	public ICommand InverseResultCommand { get; set; }
+	public ICommand InvertShowOpenDialogCommand { get; set; }
+
+
+	public ICommand OpenCommand { get; set; }
+	public ICommand DisconnectCommand { get; }
+	public ICommand RefreshCommand { get; }
 	public ICommand RunCommand { get; }
+	public ICommand BeginCommand { get; }
+	public ICommand CommitCommand { get; }
+	public ICommand RollbackCommand { get; }
+	public ICommand CheckpointCommand { get; }
 	public ICommand UpdateTextPositionCommand { get; }
 	public ICommand CodeSnippedCommand { get; }
 	public ObservableCollection<TaskData> Tasks { get; } = new();
@@ -43,16 +55,53 @@ public class MainPageViewModel : ViewModelBase
 		private set => Set(ref _isActive, value);
 	}
 
+	public bool Connected
+	{
+		get => _connected;
+		private set => Set(ref _connected, value);
+	}
+
 	public bool Loading => ActiveTask?.Executing ?? false;
 
 	public string TextPosition => $"Line: {ActiveTask?.Position.Item1} - Column: {ActiveTask?.Position.Item2}";
+	public string DocumentsStatus => ActiveTask?.Result?.Count > 0
+		? $"{ActiveTask.Result.Count} document{(ActiveTask.Result.Count > 1 ? "s" : "")}"
+		: "no document";
+	public string ElapsedStatus => ActiveTask?.Executing ?? false
+		? "Executing"
+		: ActiveTask?.Elapsed.ToString();
 
 	public MainPageViewModel()
 	{
 		_synchronizationContext = SynchronizationContext.Current;
+
+		OpenCommand = Command.Create(InvokeOpen);
+		DisconnectCommand = Command.Create(Disconnect);
+		RefreshCommand = Command.Create(LoadTreeView);
 		RunCommand = Command.Create(InvokeRun);
+		BeginCommand = Command.Create(InvokeBegin);
+		CommitCommand = Command.Create(InvokeCommit);
+		RollbackCommand = Command.Create(InvokeRollback);
+		CheckpointCommand = Command.Create(InvokeCheckpoint);
 		UpdateTextPositionCommand = Command.Create<(int, int)>(InvokeUpdatePosition);
 		CodeSnippedCommand = Command.Create<TreeNodeViewModel>(InvokeCodeSnipped);
+
+		BroadcastService.Instance.Register<ConnectionString>(ConnectionStringChanged);
+	}
+
+	#region Initialise and Connection
+
+	private void InvokeOpen()
+	{
+		InvertShowOpenDialogCommand.Execute(null);
+	}
+
+	private void ConnectionStringChanged(ConnectionString connectionString)
+	{
+		if (Connected)
+			Disconnect();
+
+		_ = InitialiseAsync(connectionString.Filename);
 	}
 
 	public async Task InitialiseAsync(string filename)
@@ -78,6 +127,7 @@ public class MainPageViewModel : ViewModelBase
 			task.WaitHandle.Set();
 		}
 
+		Connected = false;
 		Tasks.Clear();
 
 		try
@@ -87,10 +137,12 @@ public class MainPageViewModel : ViewModelBase
 
 			_db?.Dispose();
 			_db = null;
+
+			LoadTreeView();
 		}
 		catch (Exception ex)
 		{
-			//MessageBox.Show(ex.Message, "ERROR", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+			_ = DialogService.Instance.ShowErrorAsync(ex.Message);
 		}
 	}
 
@@ -104,7 +156,7 @@ public class MainPageViewModel : ViewModelBase
 			var uv = _db.UserVersion;
 
 			_connectionString = connectionString;
-
+			Connected = true;
 			LoadTreeView();
 		}
 		catch (Exception ex)
@@ -112,7 +164,7 @@ public class MainPageViewModel : ViewModelBase
 			_db?.Dispose();
 			_db = null;
 
-			//MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			_ = DialogService.Instance.ShowErrorAsync(ex.Message);
 
 			return;
 		}
@@ -121,9 +173,16 @@ public class MainPageViewModel : ViewModelBase
 	private async Task<LiteDatabase> AsyncConnect(ConnectionString connectionString) =>
 		await Task.Run(() => new LiteDatabase(connectionString));
 
+	#endregion
+
+	#region Tree and Complation
+
 	private void LoadTreeView()
 	{
 		TreeViewNodes.Clear();
+
+		if (!Connected)
+			return;
 
 		var rootNode = new TreeNodeViewModel(Path.GetFileName(_connectionString.Filename), TreeNodeType.Root)
 		{
@@ -162,37 +221,18 @@ public class MainPageViewModel : ViewModelBase
 		TreeViewNodes.Add(rootNode);
 	}
 
-	private void InvokeRun()
-	{
-		if (ActiveTask?.Executing == false)
-		{
-			ActiveTask.Sql = ActiveTask.EditorContent;
-			ActiveTask.WaitHandle.Set();
-			RaisePropertyChanged(nameof(Loading));
-		}
-	}
-
-	private void InvokeUpdatePosition((int, int) positions)
-	{
-		if (!_isActive)
-			return;
-
-		if (ActiveTask == null)
-			return;
-
-		ActiveTask.Position = positions;
-		RaisePropertyChanged(nameof(TextPosition));
-	}
-
 	private void InvokeCodeSnipped(TreeNodeViewModel node)
 	{
 		if (string.IsNullOrWhiteSpace(node.Query))
 			return;
 
+		if (!Connected || ActiveTask == null)
+			return;
+
 		if (string.IsNullOrWhiteSpace(ActiveTask.EditorContent))
 		{
 			ActiveTask.EditorContent = node.Query;
-			RaisePropertyChanged(nameof(ActiveTask));
+			InvokeStatusUpdate();
 		}
 		else
 		{
@@ -204,9 +244,57 @@ public class MainPageViewModel : ViewModelBase
 			finally
 			{
 				IsActive = true;
+				InvokeStatusUpdate();
 			}
 		}
 	}
+
+	#endregion
+
+	#region Run and transaction
+
+	private void ExecuteSql(string sql)
+	{
+		if (!Connected) return;
+		if (ActiveTask?.Executing != false) return;
+
+		ActiveTask.Sql = sql;
+		ActiveTask.WaitHandle.Set();
+		RaisePropertyChanged(nameof(Loading));
+	}
+
+	private void InvokeRun() => ExecuteSql(ActiveTask.EditorContent);
+	private void InvokeBegin() => ExecuteSql("BEGIN");
+	private void InvokeCommit() => ExecuteSql("COMMIT");
+	private void InvokeRollback() => ExecuteSql("ROLLBACK");
+	private void InvokeCheckpoint() => ExecuteSql("CHECKPOINT");
+
+	#endregion
+
+	#region Status
+
+	private void InvokeStatusUpdate()
+	{
+		RaisePropertyChanged(nameof(TextPosition));
+		RaisePropertyChanged(nameof(DocumentsStatus));
+		RaisePropertyChanged(nameof(ElapsedStatus));
+		RaisePropertyChanged(nameof(Loading));
+		RaisePropertyChanged(nameof(IsActive));
+		RaisePropertyChanged(nameof(ActiveTask));
+	}
+
+	private void InvokeUpdatePosition((int, int) positions)
+	{
+		if (!_isActive || ActiveTask == null || !Connected)
+			return;
+
+		ActiveTask.Position = positions;
+		RaisePropertyChanged(nameof(TextPosition));
+	}
+
+	#endregion
+
+	#region Tab and task manager
 
 	private void InvokeSelectedTaskChanged(TaskData value)
 	{
@@ -227,17 +315,12 @@ public class MainPageViewModel : ViewModelBase
 		finally
 		{
 			IsActive = true;
+			InvokeStatusUpdate();
 		}
-
-		RaisePropertyChanged(nameof(TextPosition));
 	}
-
 
 	private void AddNewTask(string content)
 	{
-		// find + tab
-		//var tab = tabSql.TabPages.Cast<TabPage>().Where(x => x.Text == "+").Single();
-
 		var task = new TaskData();
 
 		task.EditorContent = content;
@@ -248,18 +331,6 @@ public class MainPageViewModel : ViewModelBase
 
 		Tasks.Insert(Tasks.Count == 0 ? 0 : Tasks.Count - 1, task);
 		ActiveTask = task;
-		//tab.Text = tab.Name = task.Id.ToString();
-		// tab.Tag = task;
-		//
-		// if (tabSql.SelectedTab != tab)
-		// {
-		// 	tabSql.SelectTab(tab);
-		// }
-		//
-		// // adding new + tab at end
-		// tabSql.TabPages.Add("+", "+");
-		//
-		// tabResult.SelectTab("tabGrid");
 	}
 
 	private void CreateThread(TaskData task)
@@ -344,6 +415,8 @@ public class MainPageViewModel : ViewModelBase
 				InverseResultCommand?.Execute(data),
 			data);
 
-		RaisePropertyChanged(nameof(Loading));
+		InvokeStatusUpdate();
 	}
+
+	#endregion
 }

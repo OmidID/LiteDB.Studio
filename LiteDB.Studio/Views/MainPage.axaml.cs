@@ -48,22 +48,46 @@ namespace LiteDB.Studio.Views
 
 		private void SetupViewModel()
 		{
-			ViewModel.InverseResultCommand = Command.Create<TaskData>(RenderResult);
+			ViewModel.InverseResultCommand = Command.Create<TaskData>(RenderResult, () => false);
+			ViewModel.InvertShowOpenDialogCommand = Command.Create(InvokeShowOpenDialog, () => false);
 			ViewModel.PropertyChanged += ViewModelOnPropertyChanged;
-			_ = ViewModel.InitialiseAsync("test.db");
+			//_ = ViewModel.InitialiseAsync("test.db");
 		}
 
 		private void ViewModelOnPropertyChanged(object sender, PropertyChangedEventArgs e)
 		{
-			if (e.PropertyName == nameof(ViewModel.ActiveTask))
+			switch (e.PropertyName)
 			{
-				UpdateEditors();
+				case nameof(ViewModel.ActiveTask):
+					UpdateEditors();
+					break;
+				case nameof(ViewModel.Connected):
+					ConnectionStatusChanged();
+					break;
+			}
+		}
+
+		private void ConnectionStatusChanged()
+		{
+			if (!ViewModel.Connected)
+			{
+				this.FindControl<DataGrid>("DataGrid").Clear();
+				_textEditor.Text = "";
+				_textResultEditor.Text = "";
+				_textResultEditor.Text = "";
 			}
 		}
 
 		private void UpdateEditors()
 		{
 			_textEditor.Text = ViewModel.ActiveTask?.EditorContent;
+		}
+
+
+		private async void InvokeShowOpenDialog()
+		{
+			var connectionPage = new ConnectionPage();
+			_ = await connectionPage.ShowDialog<ConnectionString>(this);
 		}
 
 		private void RenderResult(TaskData data)

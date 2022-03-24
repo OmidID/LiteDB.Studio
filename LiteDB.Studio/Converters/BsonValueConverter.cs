@@ -20,6 +20,20 @@ public class BsonValueConverter : IValueConverter
 
 	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
-		return value;
+		if (parameter is BsonDocument bson)
+		{
+			if (value == null)
+			{
+				bson.Remove(Key);
+			}
+			else
+			{
+				bson[Key] = new BsonValue(System.Convert.ChangeType(value, targetType));
+			}
+
+			return bson;
+		}
+
+		throw new InvalidCastException("Parameter is null or not a BsonDocument");
 	}
 }

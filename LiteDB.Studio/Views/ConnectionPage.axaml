@@ -1,0 +1,65 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="250"
+        xmlns:i="clr-namespace:Projektanker.Icons.Avalonia;assembly=Projektanker.Icons.Avalonia"
+        xmlns:converters="clr-namespace:LiteDB.Studio.Converters"
+        x:Class="LiteDB.Studio.Views.ConnectionPage"
+        Title="ConnectionPage"
+        Width="550" Height="400">
+	<Window.Resources>
+		<ResourceDictionary>
+			<converters:FileNameConverter x:Key="FileNameConverter" />
+		</ResourceDictionary>
+	</Window.Resources>
+	<Window.Styles>
+		<Style Selector="TextBlock">
+			<Setter Property="VerticalAlignment" Value="Center"></Setter>
+		</Style>
+		<Style Selector=".Action > Button">
+			<Setter Property="Padding" Value="40 12"></Setter>
+		</Style>
+	</Window.Styles>
+	<Grid ColumnDefinitions="3*,1*,3*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" Margin="20">
+		<TextBlock Grid.Row="0" Grid.Column="1" Text="File" HorizontalAlignment="Right"></TextBlock>
+		<TextBox Grid.Row="0" Grid.Column="2"
+		         HorizontalAlignment="Stretch"
+		         Margin="2, 2, 30, 2"
+		         Name="FileTextBox"
+		         Text="{Binding FilePath}"></TextBox>
+		<Button Grid.Row="0" Grid.Column="2" HorizontalAlignment="Right" Content="..." Click="Button_OnClick"></Button>
+
+		<StackPanel Grid.ColumnSpan="2"
+		            Grid.Column="1"
+		            Grid.Row="5"
+		            Classes="Action"
+		            HorizontalAlignment="Right"
+		            VerticalAlignment="Bottom"
+		            Orientation="Horizontal">
+			<Button Content="Open" Foreground="Green" Command="{Binding OpenCommand}"></Button>
+			<Button Content="Cancel" Command="{Binding CloseCommand}"></Button>
+		</StackPanel>
+		<ScrollViewer Grid.Column="0" Grid.Row="0" Grid.RowSpan="6">
+			<ItemsControl Items="{Binding ConnectionStrings}">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<Grid ColumnDefinitions="*,Auto">
+							<Button Classes="Hyperlink"
+							        Content="{Binding Filename, Converter={StaticResource FileNameConverter}}"
+							        CommandParameter="{Binding .}"
+							        Command="{Binding DataContext.RecentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+							        HorizontalAlignment="Stretch"
+							        ToolTip.Tip="{Binding Filename}"></Button>
+							<Button Grid.Column="1"
+							        CommandParameter="{Binding .}"
+							        Command="{Binding DataContext.RecentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+							        i:Attached.Icon="fas fa-info-circle"></Button>
+						</Grid>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</ScrollViewer>
+	</Grid>
+</Window>
+
