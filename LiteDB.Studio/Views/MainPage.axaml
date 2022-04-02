@@ -6,7 +6,13 @@
         xmlns:i="clr-namespace:Projektanker.Icons.Avalonia;assembly=Projektanker.Icons.Avalonia"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="LiteDB.Studio.Views.MainPage"
+        Name="MainPage"
         Title="MainPage">
+	<Window.Resources>
+		<ResourceDictionary>
+
+		</ResourceDictionary>
+	</Window.Resources>
 	<DockPanel>
 		<StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Classes="Toolbar">
 			<Button Content="Open" Tag="fas fa-plug" Command="{Binding OpenCommand}" IsVisible="{Binding !Connected}" />
@@ -52,10 +58,23 @@
 			</SplitView.Pane>
 
 			<Grid RowDefinitions="30,*,2,*">
-				<TabStrip Items="{Binding Tasks}" SelectedItem="{Binding ActiveTask}" IsEnabled="{Binding Connected}">
+				<TabStrip
+					Items="{Binding Tasks}"
+				    SelectedItem="{Binding ActiveTask}"
+					IsEnabled="{Binding Connected}">
 					<TabStrip.ItemTemplate>
 						<DataTemplate>
-							<TextBlock Text="{Binding Title}" />
+							<TextBlock Text="{Binding Title}" Tag="{Binding .}" PointerReleased="TabItemOnPointerReleased">
+								<TextBlock.ContextMenu>
+									<ContextMenu IsVisible="{Binding !!Id}">
+										<MenuItem Header="Close" Command="{Binding DataContext.TabCloseCommand, ElementName=MainPage}" CommandParameter="{Binding .}"></MenuItem>
+										<MenuItem Header="Close all tabs" Command="{Binding DataContext.TabCloseAllCommand, ElementName=MainPage}" CommandParameter="{Binding .}"></MenuItem>
+										<MenuItem Header="Close other tabs" Command="{Binding DataContext.TabCloseOthersCommand, ElementName=MainPage}" CommandParameter="{Binding .}"></MenuItem>
+										<MenuItem Header="Close tabs to right" Command="{Binding DataContext.TabCloseToRightCommand, ElementName=MainPage}" CommandParameter="{Binding .}"></MenuItem>
+										<MenuItem Header="Close tabs to left" Command="{Binding DataContext.TabCloseToLeftCommand, ElementName=MainPage}" CommandParameter="{Binding .}"></MenuItem>
+									</ContextMenu>
+								</TextBlock.ContextMenu>
+							</TextBlock>
 						</DataTemplate>
 					</TabStrip.ItemTemplate>
 				</TabStrip>
@@ -73,6 +92,7 @@
 				<TabControl Grid.Row="3">
 					<TabItem Header="Grid">
 						<DataGrid Name="DataGrid"
+						          CellEditEnded="OnCellEditEnded"
 						          IsEnabled="{Binding Connected}"
 						          AutoGenerateColumns="False"
 						          VerticalAlignment="Stretch"

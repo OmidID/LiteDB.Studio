@@ -2,12 +2,20 @@ using System;
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using AvaloniaEdit;
 using AvaloniaEdit.TextMate;
 using LiteDB.Studio.ViewModels;
 using TextMateSharp.Grammars;
+
+#if TREE_DATA_GRID
+using Avalonia.Controls.Models.TreeDataGrid;
+using AppDataGrid = Avalonia.Controls.TreeDataGrid;
+#else
+using AppDataGrid = Avalonia.Controls.DataGrid;
+#endif
 
 namespace LiteDB.Studio.Views
 {
@@ -29,15 +37,8 @@ namespace LiteDB.Studio.Views
 		public MainPage()
 		{
 			InitializeComponent();
-#if DEBUG
-			//this.AttachDevTools();
-#endif
 
-			SetupEditor();
-			SetupResultEditor();
-			SetupParameterEditor();
-
-			DataContext = ViewModel = new MainPageViewModel();
+			SetupUi();
 			SetupViewModel();
 		}
 
@@ -46,12 +47,21 @@ namespace LiteDB.Studio.Views
 			AvaloniaXamlLoader.Load(this);
 		}
 
+		private void SetupUi()
+		{
+			SetupEditor();
+			SetupResultEditor();
+			SetupParameterEditor();
+		}
+
 		private void SetupViewModel()
 		{
+			DataContext = ViewModel = new MainPageViewModel();
+
 			ViewModel.InverseResultCommand = Command.Create<TaskData>(RenderResult, () => false);
 			ViewModel.InvertShowOpenDialogCommand = Command.Create(InvokeShowOpenDialog, () => false);
 			ViewModel.PropertyChanged += ViewModelOnPropertyChanged;
-			//_ = ViewModel.InitialiseAsync("test.db");
+			_ = ViewModel.CheckLastRecentConnectionAsync();
 		}
 
 		private void ViewModelOnPropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -71,7 +81,7 @@ namespace LiteDB.Studio.Views
 		{
 			if (!ViewModel.Connected)
 			{
-				this.FindControl<DataGrid>("DataGrid").Clear();
+				this.FindControl<AppDataGrid>("DataGrid").Clear();
 				_textEditor.Text = "";
 				_textResultEditor.Text = "";
 				_textResultEditor.Text = "";
@@ -94,7 +104,7 @@ namespace LiteDB.Studio.Views
 		{
 			 if (data == null) return;
 
-			 this.FindControl<DataGrid>("DataGrid").Clear();
+			 this.FindControl<AppDataGrid>("DataGrid").Clear();
 			 _textResultEditor.Text = "";
 			 _textResultEditor.Text = "";
 
@@ -107,15 +117,14 @@ namespace LiteDB.Studio.Views
 			 {
 				 _textResultEditor.BindErrorMessage(_resultTextMateInstallation, _textResultRegistryOptions, data.Sql, data.Exception);
 				 _textParameterEditor.BindErrorMessage(_parameterTextMateInstallation, _textParameterRegistryOptions, data.Sql, data.Exception);
-				 this.FindControl<DataGrid>("DataGrid").BindErrorMessage(data.Sql, data.Exception);
+				 this.FindControl<AppDataGrid>("DataGrid").BindErrorMessage(data.Sql, data.Exception);
 				 return;
 			 }
 
 			 if (data.Result == null)
 				 return;
 
-			 this.FindControl<DataGrid>("DataGrid")
-				 .BindBsonData(data);
+			 this.FindControl<AppDataGrid>("DataGrid").BindBsonData(data);
 			 _textResultEditor.BindBsonData(_resultTextMateInstallation, _textResultRegistryOptions, data);
 			 _textParameterEditor.BindParameter(_parameterTextMateInstallation, _textParameterRegistryOptions, data);
 		}
@@ -171,11 +180,32 @@ namespace LiteDB.Studio.Views
 			ViewModel.ActiveTask.EditorContent = _textEditor.Text;
 		}
 
+		private void OnCellEditEnded(object sender, DataGridCellEditEndedEventArgs e)
+		{
+			if (e.EditAction != DataGridEditAction.Commit) return;
+
+			var bson = e.Row.DataContext as BsonValue;
+			if (bson == null) return;
+
+			var key = e.Column.Header?.ToString();
+			if (string.IsNullOrEmpty(key)) return;
+
+			ViewModel.CellUpdateCommand?.Execute((bson, key));
+		}
+
 		private void TreeViewItem_OnDoubleTapped(object sender, RoutedEventArgs e)
 		{
-			if (e.Source is StyledElement element && element.DataContext is TreeNodeViewModel nodeViewModel)
+			if (e.Source is StyledElement { DataContext: TreeNodeViewModel nodeViewModel })
 			{
 				ViewModel.CodeSnippedCommand.Execute(nodeViewModel);
+			}
+		}
+
+		private void TabItemOnPointerReleased(object sender, PointerReleasedEventArgs e)
+		{
+			if (e.InitialPressMouseButton == MouseButton.Middle && (sender as Control)?.Tag is TaskData task)
+			{
+				ViewModel.TabCloseCommand.Execute(task);
 			}
 		}
 	}

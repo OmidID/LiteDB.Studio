@@ -8,32 +8,29 @@ public class BsonValueConverter : IValueConverter
 {
 	public string Key { get; set; }
 
-	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
 	{
-		if (value is BsonDocument doc)
-		{
-			return doc[Key].RawValue?.ToString();
-		}
+		if (value is not BsonDocument doc) return null;
 
-		return null;
+		var rawValue = doc[Key]?.RawValue;
+		return rawValue?.GetType() == targetType ? rawValue : rawValue?.ToString();
 	}
 
-	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
 	{
-		if (parameter is BsonDocument bson)
-		{
-			if (value == null)
-			{
-				bson.Remove(Key);
-			}
-			else
-			{
-				bson[Key] = new BsonValue(System.Convert.ChangeType(value, targetType));
-			}
+		if (parameter is not BsonDocument bson)
+			throw new InvalidCastException("Parameter is null or not a BsonDocument");
 
-			return bson;
+		if (value == null)
+		{
+			bson.Remove(Key);
+		}
+		else
+		{
+			bson[Key] = new BsonValue(System.Convert.ChangeType(value, targetType));
 		}
 
-		throw new InvalidCastException("Parameter is null or not a BsonDocument");
+		return bson;
+
 	}
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -7,227 +8,241 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using AvaloniaEdit;
 using AvaloniaEdit.TextMate;
-using LiteDB.Studio.Converters;
 using TextMateSharp.Grammars;
+
+#if TREE_DATA_GRID
+using Avalonia.Controls.Models.TreeDataGrid;
+using AppDataGrid = Avalonia.Controls.TreeDataGrid;
+#else
+using AppDataGrid = Avalonia.Controls.DataGrid;
+#endif
+
 
 namespace LiteDB.Studio
 {
-    static class UiExtensions
-    {
-	    public static void BindBsonData(this DataGrid grd, TaskData data)
-        {
-            // hide grid if has more than 100 rows
-            grd.IsVisible = data.Result.Count < 100;
-            grd.Clear();
+	static class UiExtensions
+	{
+		public static void BindBsonData(this AppDataGrid grd, TaskData data)
+		{
+			// hide grid if has more than 100 rows
+			grd.IsVisible = data.Result.Count < 100;
+			grd.Clear();
 
-            foreach (var value in data.Result)
-            {
-                //var row = new DataGridRow();
+#if TREE_DATA_GRID
+			var source = new FlatTreeDataGridSource<BsonValue>(data.Result);
+			var checkList = new Dictionary<string, IColumn<BsonValue>>();
 
-                var doc = value.IsDocument ?
-                    value.AsDocument :
-                    new BsonDocument { ["[value]"] = value };
+			foreach (var value in data.Result)
+			{
+				//var row = new DataGridRow();
 
-                if (doc.Keys.Count == 0) doc["[root]"] = "{}";
+				var doc = value.IsDocument ? value.AsDocument : new BsonDocument { ["[value]"] = value };
 
-                foreach (var key in doc.Keys)
-                {
-	                if (grd.Columns.FirstOrDefault(f => f.Header == key) is DataGridTextColumn col) continue;
+				if (doc.Keys.Count == 0) doc["[root]"] = "{}";
 
-	                col = new DataGridTextColumn() { Header = key };
-                    grd.Columns.Add(col);
+				foreach (var key in doc.Keys)
+				{
+					if (checkList.ContainsKey(key)) continue;
 
-                    col.Width = DataGridLength.Auto;
+					IColumn<BsonValue> col = doc[key].Type switch
+					{
+						BsonType.Boolean => new TextColumn<BsonValue, bool>(
+							key,
+							v => v[key].AsBoolean,
+							(b, v) => b[key] = v),
+						_ => new TextColumn<BsonValue, string>(
+							key,
+							v => v[key].ToString(),
+							(b, v) => b[key] = v),
+					};
 
-                    col.IsReadOnly = key == "_id";
-                    col.Binding = new Binding
-                    {
-	                    Mode = BindingMode.TwoWay,
-	                    Converter = new BsonValueConverter()
-	                    {
-		                    Key = key
-	                    }
-                    };
-                }
+					checkList.Add(key, col);
+					source.Columns.Add(col);
+				}
+			}
+			grd.Source = source;
+#else
+			foreach (var value in data.Result)
+			{
+				var doc = value.IsDocument ? value.AsDocument : new BsonDocument { ["value"] = value };
 
-                //row.DefaultCellStyle.BackColor = Color.Silver;
-                //row.CreateCells(grd);
+				if (doc.Keys.Count == 0) doc["[root]"] = "{}";
 
+				foreach (var key in doc.Keys)
+				{
+					if (grd.Columns.Any(f => f.Header?.ToString() == key)) continue;
 
-                // foreach (var key in doc.Keys)
-                // {
-                //     var col = grd.Columns[key];
-                //     var cell = row.Cells[col.Index];
-                //
-                //     cell.Style.BackColor = Color.White;
-                //     cell.Value = value.IsDocument ? value[key] : value;
-                //
-                //     row.ReadOnly = key == "_id";
-                // }
-                //
-                // grd.Rows.Add(row);
-            }
+					DataGridBoundColumn col = doc[key].Type switch
+					{
+						BsonType.Boolean => new DataGridCheckBoxColumn() { Header = key },
+						_ => new DataGridTextColumn() { Header = key }
+					};
 
-            // if (data.LimitExceeded)
-            // {
-            //     var limitRow = new DataGridViewRow();
-            //     limitRow.CreateCells(grd);
-            //     limitRow.DefaultCellStyle.ForeColor = Color.OrangeRed;
-            //     var cell = limitRow.Cells[0];
-            //     cell.Value = "Limit exceeded";
-            //     cell.ReadOnly = true;
-            //     grd.Rows.Add(limitRow);
-            // }
-            //
-            // for (int i = 0; i <= grd.Columns.Count - 1; i++)
-            // {
-            //     var colw = grd.Columns[i].Width;
-            //     grd.Columns[i].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            //     grd.Columns[i].Width = Math.Min(colw, 400);
-            // }
-            //
-            // if (grd.Rows.Count == 0)
-            // {
-            //     grd.Columns.Add("no-data", "[no result]");
-            // }
+					grd.Columns.Add(col);
 
-            grd.IsReadOnly = !grd.Columns.Any(f=>f.Header == "_id");
-            grd.IsVisible = true;
+					col.Width = DataGridLength.Auto;
+					col.IsReadOnly = key == "_id" ||
+					                 doc[key].Type is BsonType.Document
+						                 or BsonType.Array
+						                 or BsonType.ObjectId
+						                 or BsonType.Binary;
 
-            grd.Items = data.Result;
-        }
+					col.Binding = new Binding
+					{
+						Mode = BindingMode.TwoWay,
+						Path = key
+					};
+				}
+			}
 
-        public static void Clear(this DataGrid grd)
-        {
-            grd.Columns.Clear();
-            grd.Items = null;
-        }
+			grd.IsReadOnly = grd.Columns.All(f => f.Header?.ToString() != "_id");
+			grd.Items = data.Result;
+#endif
 
-        public static void BindBsonData(
-	        this TextEditor txt,
-	        TextMate.Installation textMate,
-	        RegistryOptions registryOptions,
-	        TaskData data)
-        {
-            var index = 0;
-            var sb = new StringBuilder();
+			grd.IsVisible = true;
+		}
 
-            using (var writer = new StringWriter(sb))
-            {
-                var json = new JsonWriter(writer)
-                {
-                    Pretty = true,
-                    Indent = 2
-                };
+		public static void Clear(this AppDataGrid grd)
+		{
+#if TREE_DATA_GRID
+			var pass = grd.Source;
+			grd.Source = null;
+			(pass as IDisposable)?.Dispose();
+#else
+			grd.Columns.Clear();
+			grd.Items = null;
+#endif
+		}
 
-                if (data.Result.Count > 0)
-                {
-                    foreach (var value in data.Result)
-                    {
-                        if (data.Result?.Count > 1)
-                        {
-                            sb.AppendLine($"/* {index++ + 1} */");
-                        }
+		public static void BindBsonData(
+			this TextEditor txt,
+			TextMate.Installation textMate,
+			RegistryOptions registryOptions,
+			TaskData data)
+		{
+			var index = 0;
+			var sb = new StringBuilder();
 
-                        json.Serialize(value);
-                        sb.AppendLine();
-                    }
+			using (var writer = new StringWriter(sb))
+			{
+				var json = new JsonWriter(writer)
+				{
+					Pretty = true,
+					Indent = 2
+				};
 
-                    if (data.LimitExceeded)
-                    {
-                        sb.AppendLine();
-                        sb.AppendLine("/* Limit exceeded */");
-                    }
-                }
-                else
-                {
-                    sb.AppendLine("no result");
-                }
-            }
+				if (data.Result.Count > 0)
+				{
+					foreach (var value in data.Result)
+					{
+						if (data.Result?.Count > 1)
+						{
+							sb.AppendLine($"/* {index++ + 1} */");
+						}
 
-            textMate.SetGrammar(registryOptions.GetScopeByLanguageId(registryOptions.GetLanguageByExtension(".json").Id));
-            txt.Text = sb.ToString();
-        }
+						json.Serialize(value);
+						sb.AppendLine();
+					}
 
-        public static void BindErrorMessage(this DataGrid grid, string sql, Exception ex)
-        {
-            grid.Clear();
+					if (data.LimitExceeded)
+					{
+						sb.AppendLine();
+						sb.AppendLine("/* Limit exceeded */");
+					}
+				}
+				else
+				{
+					sb.AppendLine("no result");
+				}
+			}
 
-            var col = new DataGridTextColumn() { Header = "Error" };
-            grid.Columns.Add(col);
+			textMate.SetGrammar(
+				registryOptions.GetScopeByLanguageId(registryOptions.GetLanguageByExtension(".json").Id));
+			txt.Text = sb.ToString();
+		}
 
-            col.Width = DataGridLength.Auto;
+		public static void BindErrorMessage(this AppDataGrid grid, string sql, Exception ex)
+		{
+			grid.Clear();
+#if TREE_DATA_GRID
+#else
+			var col = new DataGridTextColumn() { Header = "Error" };
+			grid.Columns.Add(col);
 
-            col.IsReadOnly = true;
-            col.Binding = new Binding();
+			col.Width = DataGridLength.Auto;
 
-            grid.Items = new List<string>() { ex.Message };
-        }
+			col.IsReadOnly = true;
+			col.Binding = new Binding();
 
-        public static void BindErrorMessage(
-	        this TextEditor txt,
-	        TextMate.Installation textMate,
-	        RegistryOptions registryOptions,
-	        string sql,
-	        Exception ex)
-        {
-            var sb = new StringBuilder();
+			grid.Items = new List<string>() { ex.Message };
+#endif
+		}
 
-            if (!(ex is LiteException))
-            {
-                sb.AppendLine(ex.Message);
-                sb.AppendLine();
-                sb.AppendLine("===================================================");
-                sb.AppendLine(ex.StackTrace);
-            }
-            else if (ex is LiteException lex)
-            {
-                sb.AppendLine(ex.Message);
+		public static void BindErrorMessage(
+			this TextEditor txt,
+			TextMate.Installation textMate,
+			RegistryOptions registryOptions,
+			string sql,
+			Exception ex)
+		{
+			var sb = new StringBuilder();
 
-                if (lex.ErrorCode == LiteException.UNEXPECTED_TOKEN && sql != null)
-                {
-                    var p = (int)lex.Position;
-                    var start = (int)Math.Max(p - 30, 1) - 1;
-                    var end = Math.Min(p + 15, sql.Length);
-                    var length = end - start;
+			if (!(ex is LiteException))
+			{
+				sb.AppendLine(ex.Message);
+				sb.AppendLine();
+				sb.AppendLine("===================================================");
+				sb.AppendLine(ex.StackTrace);
+			}
+			else if (ex is LiteException lex)
+			{
+				sb.AppendLine(ex.Message);
 
-                    var str = sql.Substring(start, length).Replace('\n', ' ').Replace('\r', ' ');
-                    var t = length - (end - p);
+				if (lex.ErrorCode == LiteException.UNEXPECTED_TOKEN && sql != null)
+				{
+					var p = (int)lex.Position;
+					var start = (int)Math.Max(p - 30, 1) - 1;
+					var end = Math.Min(p + 15, sql.Length);
+					var length = end - start;
 
-                    sb.AppendLine();
-                    sb.AppendLine(str);
-                    sb.AppendLine("".PadLeft(t, '-') + "^");
-                }
-            }
+					var str = sql.Substring(start, length).Replace('\n', ' ').Replace('\r', ' ');
+					var t = length - (end - p);
 
-            textMate.SetGrammar(null);
-            txt.Clear();
-            txt.Text = sb.ToString();
-        }
+					sb.AppendLine();
+					sb.AppendLine(str);
+					sb.AppendLine("".PadLeft(t, '-') + "^");
+				}
+			}
 
-        public static void BindParameter(
-	        this TextEditor txt,
-	        TextMate.Installation textMate,
-	        RegistryOptions registryOptions,
-	        TaskData data)
-        {
-	        txt.Clear();
-	        textMate.SetGrammar(registryOptions.GetScopeByLanguageId(registryOptions.GetLanguageByExtension(".json").Id));
+			textMate.SetGrammar(null);
+			txt.Clear();
+			txt.Text = sb.ToString();
+		}
 
-            var sb = new StringBuilder();
+		public static void BindParameter(
+			this TextEditor txt,
+			TextMate.Installation textMate,
+			RegistryOptions registryOptions,
+			TaskData data)
+		{
+			txt.Clear();
+			textMate.SetGrammar(
+				registryOptions.GetScopeByLanguageId(registryOptions.GetLanguageByExtension(".json").Id));
 
-            using (var writer = new StringWriter(sb))
-            {
-                var w = new JsonWriter(writer)
-                {
-                    Pretty = true,
-                    Indent = 2
-                };
+			var sb = new StringBuilder();
 
-                w.Serialize(data.Parameters ?? BsonValue.Null);
-            }
+			using (var writer = new StringWriter(sb))
+			{
+				var w = new JsonWriter(writer)
+				{
+					Pretty = true,
+					Indent = 2
+				};
 
-            txt.Text = sb.ToString();
-        }
-    }
+				w.Serialize(data.Parameters ?? BsonValue.Null);
+			}
+
+			txt.Text = sb.ToString();
+		}
+	}
 }

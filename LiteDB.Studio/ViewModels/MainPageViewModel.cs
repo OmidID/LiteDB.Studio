@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -25,8 +24,13 @@ public class MainPageViewModel : ViewModelBase
 	public ICommand InverseResultCommand { get; set; }
 	public ICommand InvertShowOpenDialogCommand { get; set; }
 
+	public ICommand TabCloseCommand { get; }
+	public ICommand TabCloseAllCommand { get; }
+	public ICommand TabCloseOthersCommand { get; }
+	public ICommand TabCloseToRightCommand { get; }
+	public ICommand TabCloseToLeftCommand { get; }
 
-	public ICommand OpenCommand { get; set; }
+	public ICommand OpenCommand { get; }
 	public ICommand DisconnectCommand { get; }
 	public ICommand RefreshCommand { get; }
 	public ICommand RunCommand { get; }
@@ -36,6 +40,8 @@ public class MainPageViewModel : ViewModelBase
 	public ICommand CheckpointCommand { get; }
 	public ICommand UpdateTextPositionCommand { get; }
 	public ICommand CodeSnippedCommand { get; }
+
+	public ICommand CellUpdateCommand { get; }
 	public ObservableCollection<TaskData> Tasks { get; } = new();
 	public ObservableCollection<TreeNodeViewModel> TreeViewNodes { get; } = new();
 
@@ -75,9 +81,15 @@ public class MainPageViewModel : ViewModelBase
 	{
 		_synchronizationContext = SynchronizationContext.Current;
 
+		TabCloseCommand = Command.Create<TaskData>(InvokeTabClose);
+		TabCloseAllCommand = Command.Create<TaskData>(InvokeTabCloseAll);
+		TabCloseOthersCommand = Command.Create<TaskData>(InvokeTabCloseOthers);
+		TabCloseToRightCommand = Command.Create<TaskData>(InvokeTabCloseToRight);
+		TabCloseToLeftCommand = Command.Create<TaskData>(InvokeTabCloseToLeft);
+
 		OpenCommand = Command.Create(InvokeOpen);
 		DisconnectCommand = Command.Create(Disconnect);
-		RefreshCommand = Command.Create(LoadTreeView);
+		RefreshCommand = Command.Create(CompareTablesWithTree);
 		RunCommand = Command.Create(InvokeRun);
 		BeginCommand = Command.Create(InvokeBegin);
 		CommitCommand = Command.Create(InvokeCommit);
@@ -85,6 +97,7 @@ public class MainPageViewModel : ViewModelBase
 		CheckpointCommand = Command.Create(InvokeCheckpoint);
 		UpdateTextPositionCommand = Command.Create<(int, int)>(InvokeUpdatePosition);
 		CodeSnippedCommand = Command.Create<TreeNodeViewModel>(InvokeCodeSnipped);
+		CellUpdateCommand = Command.Create<(BsonValue, string)>(InvokeCellUpdate);
 
 		BroadcastService.Instance.Register<ConnectionString>(ConnectionStringChanged);
 	}
@@ -102,6 +115,13 @@ public class MainPageViewModel : ViewModelBase
 			Disconnect();
 
 		_ = InitialiseAsync(connectionString.Filename);
+	}
+
+	public Task CheckLastRecentConnectionAsync()
+	{
+		return AppSettingsManager.ApplicationSettings.LastConnectionStrings != null
+			? InitialiseAsync(AppSettingsManager.ApplicationSettings.LastConnectionStrings.Filename)
+			: Task.CompletedTask;
 	}
 
 	public async Task InitialiseAsync(string filename)
@@ -123,8 +143,11 @@ public class MainPageViewModel : ViewModelBase
 	{
 		foreach (var task in Tasks)
 		{
-			task.ThreadRunning = false;
-			task.WaitHandle.Set();
+			if (task.Id > 0)
+			{
+				task.ThreadRunning = false;
+				task.WaitHandle.Set();
+			}
 		}
 
 		Connected = false;
@@ -186,12 +209,12 @@ public class MainPageViewModel : ViewModelBase
 
 		var rootNode = new TreeNodeViewModel(Path.GetFileName(_connectionString.Filename), TreeNodeType.Root)
 		{
-			Nodes = new List<TreeNodeViewModel>()
+			Nodes = new ObservableCollection<TreeNodeViewModel>()
 		};
 
 		var systemNode =  new TreeNodeViewModel("System", TreeNodeType.Dictionary)
 		{
-			Nodes = new List<TreeNodeViewModel>()
+			Nodes = new ObservableCollection<TreeNodeViewModel>()
 		};
 
 		rootNode.Nodes.Add(systemNode);
@@ -219,6 +242,30 @@ public class MainPageViewModel : ViewModelBase
 		}
 
 		TreeViewNodes.Add(rootNode);
+	}
+
+	private void CompareTablesWithTree()
+	{
+		var rootNode = TreeViewNodes.FirstOrDefault();
+		if (rootNode == null)
+			return;
+
+		var tables = _db.GetCollectionNames().ToList();
+		var notExists = tables.Except(rootNode.Nodes.Select(s => s.Name));
+		var toRemove = rootNode.Nodes
+			.Skip(1)
+			.ExceptBy(tables, s => s.Name);
+
+		foreach (var key in notExists)
+		{
+			rootNode.Nodes.Add(new TreeNodeViewModel(key, TreeNodeType.Table)
+			{
+				Query = $"SELECT $ FROM {key};"
+			});
+		}
+
+		foreach (var node in toRemove)
+			rootNode.Nodes.Remove(node);
 	}
 
 	private void InvokeCodeSnipped(TreeNodeViewModel node)
@@ -269,6 +316,27 @@ public class MainPageViewModel : ViewModelBase
 	private void InvokeRollback() => ExecuteSql("ROLLBACK");
 	private void InvokeCheckpoint() => ExecuteSql("CHECKPOINT");
 
+	private void InvokeCellUpdate((BsonValue bson, string key) parameter)
+	{
+		try
+		{
+			var r = _db.Execute($"UPDATE {this.ActiveTask.Collection} SET {parameter.key} = @0 WHERE _id = @1",
+				new BsonDocument
+				{
+					["0"] = parameter.bson[parameter.key],
+					["1"] = parameter.bson["_id"]
+				});
+
+			if (r.Current == 1) return;
+
+			throw new Exception("Current document was not found. Try run your query again");
+		}
+		catch (Exception ex)
+		{
+			_ = DialogService.Instance.ShowErrorAsync(ex.Message);
+		}
+	}
+
 	#endregion
 
 	#region Status
@@ -303,6 +371,10 @@ public class MainPageViewModel : ViewModelBase
 		try
 		{
 			IsActive = false;
+
+			if (value == null)
+				return;
+
 			if (value.Id < 1)
 			{
 				AddNewTask("");
@@ -412,10 +484,132 @@ public class MainPageViewModel : ViewModelBase
 	private void LoadResult(TaskData data)
 	{
 		_synchronizationContext?.Post(_ =>
-				InverseResultCommand?.Execute(data),
-			data);
+		{
+			InverseResultCommand?.Execute(data);
 
-		InvokeStatusUpdate();
+			InvokeStatusUpdate();
+
+			if (!data.Executing)
+			{
+				CompareTablesWithTree();
+			}
+		}, data);
+	}
+
+
+	private void InvokeTabClose(TaskData task)
+	{
+		task.ThreadRunning = false;
+		task.WaitHandle.Set();
+
+		try
+		{
+			IsActive = false;
+			Tasks.Remove(task);
+		}
+		finally
+		{
+			IsActive = true;
+		}
+
+		if (Tasks.Count == 1)
+			AddNewTask("");
+	}
+
+	private void InvokeTabCloseAll(TaskData task)
+	{
+		try
+		{
+			IsActive = false;
+			foreach (var item in Tasks.ToList())
+			{
+				if (item.Id > 0)
+				{
+					item.ThreadRunning = false;
+					item.WaitHandle.Set();
+					Tasks.Remove(item);
+				}
+			}
+		}
+		finally
+		{
+			IsActive = true;
+		}
+
+		AddNewTask("");
+	}
+
+	private void InvokeTabCloseOthers(TaskData task)
+	{
+		try
+		{
+			IsActive = false;
+			foreach (var item in Tasks.ToList())
+			{
+				if (item == task) continue;
+				if (item.Id > 0)
+				{
+					item.ThreadRunning = false;
+					item.WaitHandle.Set();
+					Tasks.Remove(item);
+				}
+			}
+		}
+		finally
+		{
+			IsActive = true;
+		}
+
+		if (Tasks.Count == 1)
+			AddNewTask("");
+	}
+
+	private void InvokeTabCloseToRight(TaskData task)
+	{
+		try
+		{
+			IsActive = false;
+			foreach (var item in Tasks.Skip(Tasks.IndexOf(task) + 1).ToList())
+			{
+				if (item.Id > 0)
+				{
+					item.ThreadRunning = false;
+					item.WaitHandle.Set();
+					Tasks.Remove(item);
+				}
+			}
+		}
+		finally
+		{
+			IsActive = true;
+		}
+
+		if (Tasks.Count == 1)
+			AddNewTask("");
+	}
+
+	private void InvokeTabCloseToLeft(TaskData task)
+	{
+		try
+		{
+			IsActive = false;
+			foreach (var item in Tasks.Take(Tasks.IndexOf(task)).ToList())
+			{
+				if (item.Id > 0)
+				{
+					item.ThreadRunning = false;
+					item.WaitHandle.Set();
+					Tasks.Remove(item);
+				}
+			}
+		}
+		finally
+		{
+			IsActive = true;
+		}
+
+		if (Tasks.Count == 1)
+			AddNewTask("");
 	}
 
 	#endregion

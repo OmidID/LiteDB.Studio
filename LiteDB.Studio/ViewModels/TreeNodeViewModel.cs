@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace LiteDB.Studio.ViewModels;
 
@@ -13,7 +14,7 @@ public class TreeNodeViewModel
 
 	public string Name { get; set; }
 	public TreeNodeType Type { get; set; }
-	public List<TreeNodeViewModel> Nodes { get; set; }
+	public ObservableCollection<TreeNodeViewModel> Nodes { get; set; }
 
 	public string Query { get; set; }
 

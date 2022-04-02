@@ -1,12 +1,37 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<OutputType>Exe</OutputType>
+		<OutputType>WinExe</OutputType>
 		<TargetFramework>net6.0</TargetFramework>
+		<RuntimeIdentifiers>win10-x64;win10-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+
+		<Authors>OmidID</Authors>
+		<Version>0.0.1</Version>
 	</PropertyGroup>
 
-	<ItemGroup>
-		<Folder Include="Views\" />
-	</ItemGroup>
+	<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+		<PublishSingleFile>true</PublishSingleFile>
+		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+		<SelfContained>true</SelfContained>
+		<!--		<PublishTrimmed>true</PublishTrimmed>-->
+		<!--		<TrimmerDefaultAction>link</TrimmerDefaultAction>-->
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<UseAppHost>true</UseAppHost>
+		
+		<DebugType>None</DebugType>
+		<DebugSymbols>false</DebugSymbols>
+	</PropertyGroup>
+	
+	<PropertyGroup Condition=" $(RuntimeIdentifier.StartsWith('osx')) ">
+<!--		<CFBundleName>$(PackageId)</CFBundleName>-->
+<!--		<CFBundleDisplayName>$(Title)</CFBundleDisplayName>-->
+		<CFBundleShortVersionString>$(Version)</CFBundleShortVersionString>
+<!--		<CFBundleIconFile>IconTest.icns</CFBundleIconFile>-->
+		<NSPrincipalClass>NSApplication</NSPrincipalClass>
+		<CFBundlePackageType>AAPL</CFBundlePackageType>
+<!--		<NSRequiresAquaSystemAppearance>false</NSRequiresAquaSystemAppearance>-->
+	</PropertyGroup>
+	
+	
 
 	<ItemGroup>
 		<Compile Update="**\*.xaml.cs">
@@ -16,20 +41,19 @@
 			<SubType>Designer</SubType>
 		</AvaloniaResource>
 		<AvaloniaResource Include="Assets\*" />
-		<AvaloniaResource Remove="ICSharpCode.TextEditor\**" />
-		<Compile Remove="ICSharpCode.TextEditor\**" />
-		<!--<EmbeddedResource Include="**\*.xaml">
-		  <SubType>Designer</SubType>
-		</EmbeddedResource>-->
 	</ItemGroup>
 
-
+	<ItemGroup>
+		<PackageReference Include="Dotnet.Bundle" Version="*" />
+	</ItemGroup>
+	
 	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="0.10.13" />
 		<PackageReference Include="Avalonia.Desktop" Version="0.10.13" />
 		<PackageReference Include="Avalonia.Controls.DataGrid" Version="0.10.13" />
 		<PackageReference Include="AvaloniaEdit.TextMate" Version="0.10.12.2" />
 		<PackageReference Include="Avalonia.AvaloniaEdit" Version="0.10.12.2" />
+		<PackageReference Include="Avalonia.Controls.TreeDataGrid" Version="0.10.10" />
 
 		<PackageReference Include="Projektanker.Icons.Avalonia.FontAwesome" Version="4.2.1" />
 		<PackageReference Include="MessageBox.Avalonia" Version="2.0.0" />
@@ -41,20 +65,5 @@
 		<PackageReference Include="System.Resources.Extensions" Version="6.0.0" />
 
 	</ItemGroup>
-
-
-	<ItemGroup>
-		<AvaloniaXaml Remove="ICSharpCode.TextEditor\**" />
-	</ItemGroup>
-
-
-	<ItemGroup>
-		<EmbeddedResource Remove="ICSharpCode.TextEditor\**" />
-	</ItemGroup>
-
-
-	<ItemGroup>
-		<None Remove="ICSharpCode.TextEditor\**" />
-	</ItemGroup>
-
+	
 </Project>
