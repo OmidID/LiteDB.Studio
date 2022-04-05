@@ -6,6 +6,8 @@
 
 		<Authors>OmidID</Authors>
 		<Version>0.0.1</Version>
+		
+		<ApplicationIcon>Images/litedb-icon.ico</ApplicationIcon>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
@@ -25,7 +27,7 @@
 <!--		<CFBundleName>$(PackageId)</CFBundleName>-->
 <!--		<CFBundleDisplayName>$(Title)</CFBundleDisplayName>-->
 		<CFBundleShortVersionString>$(Version)</CFBundleShortVersionString>
-<!--		<CFBundleIconFile>IconTest.icns</CFBundleIconFile>-->
+		<CFBundleIconFile>Images/litedb-icon.icns</CFBundleIconFile>
 		<NSPrincipalClass>NSApplication</NSPrincipalClass>
 		<CFBundlePackageType>AAPL</CFBundlePackageType>
 <!--		<NSRequiresAquaSystemAppearance>false</NSRequiresAquaSystemAppearance>-->
@@ -64,6 +66,12 @@
 		<PackageReference Include="System.Configuration.ConfigurationManager" Version="6.0.0" />
 		<PackageReference Include="System.Resources.Extensions" Version="6.0.0" />
 
+	</ItemGroup>
+	
+	<ItemGroup Condition=" $(RuntimeIdentifier.StartsWith('osx')) ">
+	  <None Update="Images\litedb-icon.icns">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
 	</ItemGroup>
 	
 </Project>
